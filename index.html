@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Database Panalik-NYI - Survei Jalan</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <style>
+    :root { --primary: #1f6366; --primary-dark: #154a4d; --bg: #f0f2f5; }
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
+    body { background: var(--bg); color: #333; padding-bottom: 2rem; }
+    .header { background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); color: white; padding: 1rem; position: sticky; top: 0; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+    .header h1 { font-size: 1.3rem; margin-bottom: 0.3rem; }
+    .nav-tabs { display: flex; gap: 0.5rem; margin-top: 0.8rem; }
+    .nav-tab { flex: 1; padding: 0.6rem; background: rgba(255,255,255,0.2); border: none; color: white; border-radius: 6px; cursor: pointer; font-weight: 600; transition: 0.3s; }
+    .nav-tab.active { background: white; color: var(--primary); }
+    .container { max-width: 1000px; margin: 1rem auto; padding: 0 1rem; }
+    .section { display: none; animation: fadeIn 0.3s; }
+    .section.active { display: block; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .card { background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); padding: 1.2rem; margin-bottom: 1rem; }
+    .card-title { color: var(--primary); font-size: 1.1rem; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--primary); display: flex; align-items: center; gap: 0.5rem; }
+    .form-group { margin-bottom: 1rem; }
+    .form-group label { display: block; margin-bottom: 0.4rem; font-weight: 600; color: var(--primary); font-size: 0.9rem; }
+    .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 0.7rem; border: 1px solid #ddd; border-radius: 6px; font-size: 1rem; transition: 0.2s; }
+    .form-group input:focus, .form-group select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(31, 99, 102, 0.1); }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    @media (max-width: 600px) { .form-row { grid-template-columns: 1fr; } }
+    .btn { padding: 0.8rem 1.5rem; border: none; border-radius: 6px; cursor: pointer; font-size: 1rem; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; width: 100%; transition: 0.2s; }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: var(--primary-dark); transform: translateY(-1px); }
+    .btn-success { background: #28a745; color: white; margin-top: 1rem; }
+    .gps-btn { background: #17a2b8; color: white; padding: 0.6rem; border: none; border-radius: 6px; cursor: pointer; width: 100%; margin-top: 0.5rem; font-weight: 600; }
+    .gps-status { margin-top: 0.5rem; font-size: 0.85rem; padding: 0.5rem; border-radius: 4px; }
+    .gps-status.success { background: #d4edda; color: #155724; }
+    .gps-status.error { background: #f8d7da; color: #721c24; }
+    .photo-upload { border: 2px dashed var(--primary); border-radius: 8px; padding: 1.5rem; text-align: center; cursor: pointer; background: #f8f9fa; transition: 0.2s; }
+    .photo-upload:hover { background: #e9ecef; }
+    .photo-upload i { font-size: 2.5rem; color: var(--primary); margin-bottom: 0.5rem; }
+    .photo-upload input { display: none; }
+    #map { height: 60vh; min-height: 400px; width: 100%; border-radius: 8px; z-index: 1; }
+    .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.8rem; margin-bottom: 1rem; }
+    @media (min-width: 600px) { .stats-grid { grid-template-columns: repeat(4, 1fr); } }
+    .stat-card { background: white; padding: 1rem; border-radius: 8px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    .stat-card i { font-size: 1.5rem; color: var(--primary); margin-bottom: 0.3rem; }
+    .stat-card h3 { font-size: 1.5rem; color: var(--primary); }
+    .stat-card p { font-size: 0.8rem; color: #666; }
+    .table-container { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; min-width: 600px; }
+    th, td { padding: 0.7rem; text-align: left; border-bottom: 1px solid #eee; font-size: 0.9rem; }
+    th { background: var(--primary); color: white; position: sticky; top: 0; }
+    .loading { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 9999; justify-content: center; align-items: center; flex-direction: column; color: white; backdrop-filter: blur(2px); }
+    .loading.active { display: flex; }
+    .spinner { width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.3); border-top: 4px solid white; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 1rem; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .alert { padding: 1rem; border-radius: 6px; margin-bottom: 1rem; display: none; font-size: 0.9rem; animation: slideDown 0.3s; }
+    @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+    .alert.show { display: block; }
+    .alert-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+    .alert-error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1><i class="fas fa-road"></i> Database Panalik-NYI</h1>
+    <div class="nav-tabs">
+      <button class="nav-tab active" onclick="showSection('form')"><i class="fas fa-plus-circle"></i> Form</button>
+      <button class="nav-tab" onclick="showSection('dashboard')"><i class="fas fa-map-marked-alt"></i> Dashboard</button>
+    </div>
+  </div>
+  
+  <div class="container">
+    <div id="alert" class="alert"></div>
+    
+    <!-- FORM SECTION -->
+    <div id="form-section" class="section active">
+      <div class="card">
+        <h2 class="card-title"><i class="fas fa-clipboard-list"></i> Input Survei</h2>
+        <form id="surveyForm" onsubmit="handleSubmit(event)">
+          <div class="form-row">
+            <div class="form-group"><label>Tanggal Survei</label><input type="date" id="tanggal" required></div>
+            <div class="form-group"><label>Nama Surveyor</label><input type="text" id="surveyor" placeholder="Nama Anda" required></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Kode Ruas</label><input type="text" id="kodeRuas" placeholder="Cth: CLN-001"></div>
+            <div class="form-group"><label>Nama Ruas Jalan</label><input type="text" id="namaRuas" placeholder="Nama jalan" required></div>
+          </div>
+          <div class="form-group"><label>Desa/Kelurahan</label><input type="text" id="desa" placeholder="Nama desa"></div>
+          <div class="form-row">
+            <div class="form-group"><label>Panjang (meter)</label><input type="number" id="panjang" placeholder="0" min="0" step="0.01"></div>
+            <div class="form-group"><label>Lebar (meter)</label><input type="number" id="lebar" placeholder="0" min="0" step="0.01"></div>
+          </div>
+          <div class="form-group">
+            <label>Kondisi Jalan</label>
+            <select id="kondisi" required>
+              <option value="">-- Pilih Kondisi --</option>
+              <option value="Baik">Baik</option>
+              <option value="Rusak Ringan">Rusak Ringan</option>
+              <option value="Rusak Sedang">Rusak Sedang</option>
+              <option value="Rusak Berat">Rusak Berat</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Koordinat Lokasi</label>
+            <div class="form-row">
+              <input type="number" id="latitude" placeholder="Latitude" step="any" readonly style="background:#f8f9fa">
+              <input type="number" id="longitude" placeholder="Longitude" step="any" readonly style="background:#f8f9fa">
+            </div>
+            <button type="button" class="gps-btn" onclick="getLocation()"><i class="fas fa-location-crosshairs"></i> Ambil GPS Sekarang</button>
+            <div id="gpsStatus"></div>
+          </div>
+          <div class="form-group">
+            <label>Foto Dokumentasi</label>
+            <div class="photo-upload" onclick="document.getElementById('foto').click()">
+              <i class="fas fa-camera"></i><p>Klik untuk ambil foto / pilih dari galeri</p>
+              <input type="file" id="foto" accept="image/*" capture="environment" onchange="handlePhotoUpload(event)">
+            </div>
+            <div id="photoPreview"></div>
+          </div>
+          <div class="form-group"><label>Keterangan</label><textarea id="keterangan" rows="3" placeholder="Catatan tambahan..."></textarea></div>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Simpan Data</button>
+        </form>
+      </div>
+    </div>
+    
+    <!-- DASHBOARD SECTION -->
+    <div id="dashboard-section" class="section">
+      <div class="stats-grid">
+        <div class="stat-card"><i class="fas fa-road"></i><h3 id="totalSurvei">0</h3><p>Total Survei</p></div>
+        <div class="stat-card"><i class="fas fa-check-circle"></i><h3 id="kondisiBaik">0</h3><p>Kondisi Baik</p></div>
+        <div class="stat-card"><i class="fas fa-exclamation-triangle"></i><h3 id="kondisiRusak">0</h3><p>Rusak</p></div>
+        <div class="stat-card"><i class="fas fa-ruler-combined"></i><h3 id="totalPanjang">0</h3><p>Total (km)</p></div>
+      </div>
+      <div class="card">
+        <h2 class="card-title"><i class="fas fa-map-marked-alt"></i> Peta Sebaran</h2>
+        <div id="map"></div>
+        <button class="btn btn-success" onclick="downloadKMZ()"><i class="fas fa-file-export"></i> Download File KMZ</button>
+      </div>
+      <div class="card">
+        <h2 class="card-title"><i class="fas fa-table"></i> Tabel Data</h2>
+        <div class="table-container">
+          <table>
+            <thead><tr><th>No</th><th>Tanggal</th><th>Nama Ruas</th><th>Desa</th><th>Panjang</th><th>Kondisi</th></tr></thead>
+            <tbody id="tableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div id="loading" class="loading">
+    <div class="spinner"></div>
+    <p>Memproses data, mohon tunggu...</p>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    // ==========================================
+    // KONFIGURASI: GANTI DENGAN URL WEB APP ANDA
+    // ==========================================
+    const API_URL = "https://script.google.com/macros/s/AKfycbxY9HwN5vLXWDSy7eIHA6FpK9VvxD8VpFzXWWXh_Wio16JUv_Y1cCm5UWAEfrw1Aw_6Zg/exec";
+
+    let map, markers = [], currentPhoto = null;
+    document.getElementById('tanggal').valueAsDate = new Date();
+    
+    // Fungsi helper untuk komunikasi dengan GAS (Optimasi: menggunakan Fetch API async/await)
+    async function callAPI(action, payload = {}) {
+      showLoading(true);
+      try {
+        const response = await fetch(API_URL, {
+          method: "POST",
+          body: JSON.stringify({ action, ...payload })
+        });
+        const result = await response.json();
+        showLoading(false);
+        return result;
+      } catch (error) {
+        showLoading(false);
+        console.error("API Error:", error);
+        return { success: false, error: "Koneksi gagal: " + error.message };
+      }
+    }
+
+    function initMap() {
+      if (!map) {
+        map = L.map('map').setView([-2.5, 118], 5);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
+      }
+    }
+    
+    function showSection(sectionName) {
+      document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+      document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+      if (sectionName === 'form') {
+        document.getElementById('form-section').classList.add('active');
+        document.querySelectorAll('.nav-tab')[0].classList.add('active');
+      } else if (sectionName === 'dashboard') {
+        document.getElementById('dashboard-section').classList.add('active');
+        document.querySelectorAll('.nav-tab')[1].classList.add('active');
+        // Optimasi: invalidateSize agar peta render ulang dengan benar saat tab muncul
+        setTimeout(() => { if (map) { map.invalidateSize(); loadDashboard(); } }, 300);
+      }
+    }
+    
+    function getLocation() {
+      const statusDiv = document.getElementById('gpsStatus');
+      if (!navigator.geolocation) { statusDiv.innerHTML = '<div class="gps-status error">Browser tidak mendukung GPS</div>'; return; }
+      statusDiv.innerHTML = '<div class="gps-status">Mencari lokasi...</div>';
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          document.getElementById('latitude').value = position.coords.latitude.toFixed(6);
+          document.getElementById('longitude').value = position.coords.longitude.toFixed(6);
+          statusDiv.innerHTML = '<div class="gps-status success"><i class="fas fa-check"></i> Lokasi berhasil diambil!</div>';
+        },
+        (error) => { statusDiv.innerHTML = '<div class="gps-status error">Gagal: ' + (error.message || 'Izin ditolak') + '</div>'; },
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    }
+    
+    function handlePhotoUpload(event) {
+      const file = event.target.files[0]; if (!file) return;
+      if (file.size > 3 * 1024 * 1024) {
+        showAlert("❌ Ukuran foto terlalu besar (" + (file.size/1024/1024).toFixed(2) + " MB). Maksimal 3 MB.", "error");
+        event.target.value = ""; currentPhoto = null; document.getElementById('photoPreview').innerHTML = ''; return;
+      }
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        currentPhoto = e.target.result;
+        document.getElementById('photoPreview').innerHTML = '<img src="' + currentPhoto + '" style="max-width:100%; max-height:250px; border-radius:6px; margin-top:0.5rem;"><br><small style="color:#1f6366"><i class="fas fa-check-circle"></i> ' + file.name + ' (' + (file.size/1024).toFixed(1) + ' KB)</small>';
+      };
+      reader.readAsDataURL(file);
+    }
+    
+    function showAlert(message, type) {
+      const alertDiv = document.getElementById('alert');
+      alertDiv.className = 'alert alert-' + type + ' show';
+      alertDiv.innerHTML = message;
+      setTimeout(() => alertDiv.classList.remove('show'), 6000);
+    }
+    
+    function showLoading(show) { document.getElementById('loading').classList.toggle('active', show); }
+    
+    async function handleSubmit(event) {
+      event.preventDefault();
+      
+      const formData = {
+        tanggal: document.getElementById('tanggal').value,
+        surveyor: document.getElementById('surveyor').value,
+        kodeRuas: document.getElementById('kodeRuas').value,
+        namaRuas: document.getElementById('namaRuas').value,
+        desa: document.getElementById('desa').value,
+        panjang: document.getElementById('panjang').value,
+        lebar: document.getElementById('lebar').value,
+        kondisi: document.getElementById('kondisi').value,
+        latitude: document.getElementById('latitude').value,
+        longitude: document.getElementById('longitude').value,
+        keterangan: document.getElementById('keterangan').value,
+        fotoLink: ''
+      };
+
+      if (currentPhoto) {
+        const filename = 'Foto_' + formData.namaRuas.replace(/\s+/g, '_') + '_' + Date.now() + '.jpg';
+        const uploadRes = await callAPI("UPLOAD_IMAGE", { imageData: currentPhoto, filename });
+        
+        if (!uploadRes.success) {
+          showAlert('❌ Gagal upload foto: ' + uploadRes.error, 'error');
+          return;
+        }
+        formData.fotoLink = uploadRes.webViewLink;
+      }
+      
+      const saveRes = await callAPI("SAVE_DATA", { data: formData });
+      if (saveRes.success) {
+        showAlert('✅ ' + saveRes.message + ' (Baris: ' + saveRes.row + ')', 'success');
+        document.getElementById('surveyForm').reset(); 
+        document.getElementById('photoPreview').innerHTML = '';
+        document.getElementById('gpsStatus').innerHTML = ''; 
+        document.getElementById('tanggal').valueAsDate = new Date();
+        currentPhoto = null;
+      } else {
+        showAlert('❌ Gagal simpan: ' + saveRes.error, 'error');
+      }
+    }
+    
+    async function loadDashboard() {
+      const res = await callAPI("GET_DATA");
+      if (res.success) {
+        updateDashboard(res.data);
+      } else {
+        showAlert('❌ Gagal muat data: ' + res.error, 'error');
+      }
+    }
+    
+    function updateDashboard(data) {
+      if (!data || !Array.isArray(data) || data.length === 0) {
+        document.getElementById('totalSurvei').textContent = '0';
+        document.getElementById('kondisiBaik').textContent = '0';
+        document.getElementById('kondisiRusak').textContent = '0';
+        document.getElementById('totalPanjang').textContent = '0';
+        document.getElementById('tableBody').innerHTML = '<tr><td colspan="6" style="text-align:center; padding:2rem; color:#999;"><i class="fas fa-inbox" style="font-size:2rem; display:block; margin-bottom:0.5rem;"></i>Belum ada data survei</td></tr>';
+        markers.forEach(m => map.removeLayer(m)); markers = [];
+        return;
+      }
+      
+      let totalSurvei = data.length, kondisiBaik = 0, kondisiRusak = 0, totalPanjang = 0;
+      data.forEach(d => {
+        const kondisi = d['Kondisi Jalan'] || '';
+        if (kondisi === 'Baik') kondisiBaik++;
+        else if (kondisi) kondisiRusak++;
+        totalPanjang += parseFloat(d['Panjang (m)']) || 0;
+      });
+      
+      document.getElementById('totalSurvei').textContent = totalSurvei;
+      document.getElementById('kondisiBaik').textContent = kondisiBaik;
+      document.getElementById('kondisiRusak').textContent = kondisiRusak;
+      document.getElementById('totalPanjang').textContent = (totalPanjang / 1000).toFixed(2);
+      
+      const tbody = document.getElementById('tableBody'); tbody.innerHTML = '';
+      data.forEach((row, i) => {
+        const kondisi = row['Kondisi Jalan'] || '-';
+        const kondisiClass = kondisi === 'Baik' ? '#d4edda' : '#f8d7da';
+        const kondisiColor = kondisi === 'Baik' ? '#155724' : '#721c24';
+        const tr = document.createElement('tr');
+        tr.innerHTML = '<td>' + (i + 1) + '</td><td>' + (row['Tanggal Survei'] || '-') + '</td><td>' + (row['Nama Ruas Jalan'] || '-') + '</td><td>' + (row['Desa/Kelurahan'] || '-') + '</td><td>' + (row['Panjang (m)'] || 0) + '</td><td><span style="padding:2px 6px; border-radius:4px; background:' + kondisiClass + '; color:' + kondisiColor + '; font-size:0.8rem">' + kondisi + '</span></td>';
+        tbody.appendChild(tr);
+      });
+      
+      markers.forEach(m => map.removeLayer(m)); markers = [];
+      const validData = data.filter(d => {
+        const lat = parseFloat(d['Latitude']), lng = parseFloat(d['Longitude']);
+        return lat && lng && lat !== 0 && lng !== 0 && !isNaN(lat) && !isNaN(lng);
+      });
+      
+      if (validData.length > 0) {
+        validData.forEach(row => {
+          const lat = parseFloat(row['Latitude']), lng = parseFloat(row['Longitude']);
+          const popup = '<b>' + (row['Nama Ruas Jalan'] || 'Ruas Jalan') + '</b><br>Kode: ' + (row['Kode Ruas'] || '-') + '<br>Kondisi: ' + (row['Kondisi Jalan'] || '-') + '<br>Panjang: ' + (row['Panjang (m)'] || 0) + ' m';
+          markers.push(L.marker([lat, lng]).addTo(map).bindPopup(popup));
+        });
+        map.fitBounds(L.featureGroup(markers).getBounds().pad(0.1));
+      }
+    }
+    
+    async function downloadKMZ() {
+      const res = await callAPI("GENERATE_KMZ");
+      if (res.success) { 
+        window.open(res.downloadUrl, '_blank'); 
+        showAlert('✅ File KMZ sedang diunduh!', 'success'); 
+      } else {
+        showAlert('❌ Gagal: ' + res.error, 'error');
+      }
+    }
+    
+    window.onload = function() { initMap(); };
+  </script>
+</body>
+</html>
